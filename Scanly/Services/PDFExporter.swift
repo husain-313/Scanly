@@ -11,6 +11,7 @@ enum PDFExporter {
 
         let pdf = PDFDocument()
         var pageIndex = 0
+        var recognized: [String] = []
         for page in pages {
             guard let image = ImageFilters.shared.render(page: page) else { continue }
             guard let pdfPage = PDFPage(image: image) else { continue }
@@ -18,8 +19,16 @@ enum PDFExporter {
             if searchable {
                 let text = await OCRService.recognize(image)
                 if !text.isEmpty {
-                    // Attach recognized text so the page is searchable.
-                    pdfPage.setValue(text, forAnnotationKey: .contents)
+                    recognized.append(text)
+                    // Invisible text note keeps the content selectable/searchable.
+                    let annotation = PDFAnnotation(
+                        bounds: pdfPage.bounds(for: .mediaBox),
+                        forType: .freeText, withProperties: nil)
+                    annotation.contents = text
+                    annotation.color = .clear
+                    annotation.fontColor = .clear
+                    annotation.font = .systemFont(ofSize: 1)
+                    pdfPage.addAnnotation(annotation)
                 }
             }
             pdf.insert(pdfPage, at: pageIndex)
@@ -27,6 +36,13 @@ enum PDFExporter {
         }
 
         guard pageIndex > 0 else { return nil }
+
+        // Store recognized text in document metadata for app/file search too.
+        if searchable && !recognized.isEmpty {
+            var attrs = pdf.documentAttributes ?? [:]
+            attrs[PDFDocumentAttribute.keywordsAttribute] = recognized
+            pdf.documentAttributes = attrs
+        }
         let safeTitle = document.title.isEmpty ? "Scan" : document.title
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(safeTitle).pdf")

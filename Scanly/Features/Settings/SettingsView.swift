@@ -11,8 +11,10 @@ struct SettingsView: View {
                 Section("Security") {
                     Toggle("Lock app with Face ID", isOn: $appLockEnabled)
                 }
-                Section("Export") {
+                Section {
                     Toggle("Searchable PDF (OCR layer)", isOn: $searchablePDF)
+                } header: {
+                    Text("Export")
                 } footer: {
                     Text("Adds recognized text to PDFs so they can be searched. Slightly slower to export.")
                 }
