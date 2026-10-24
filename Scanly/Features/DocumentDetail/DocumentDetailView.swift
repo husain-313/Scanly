@@ -11,6 +11,13 @@ struct DocumentDetailView: View {
     @State private var exporting = false
     @State private var shareItems: [Any]?
     @State private var showOCR = false
+    @State private var showCrop = false
+    @State private var showReorder = false
+    @State private var showSignature = false
+
+    private var currentPage: ScanPage? {
+        pages.indices.contains(selection) ? pages[selection] : nil
+    }
 
     private var pages: [ScanPage] { document.orderedPages }
 
@@ -29,6 +36,13 @@ struct DocumentDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button { showScanner = true } label: { Label("Add pages", systemImage: "plus.viewfinder") }
+                    if currentPage != nil {
+                        Button { showCrop = true } label: { Label("Adjust edges", systemImage: "crop") }
+                        Button { showSignature = true } label: { Label("Add signature", systemImage: "signature") }
+                    }
+                    if pages.count > 1 {
+                        Button { showReorder = true } label: { Label("Reorder pages", systemImage: "arrow.up.arrow.down") }
+                    }
                     Button { showOCR = true } label: { Label("Extract text (OCR)", systemImage: "text.viewfinder") }
                     Button { Task { await exportPDF() } } label: { Label("Share PDF", systemImage: "square.and.arrow.up") }
                     Button { shareImages() } label: { Label("Share images", systemImage: "photo.stack") }
@@ -46,6 +60,9 @@ struct DocumentDetailView: View {
                 .ignoresSafeArea()
         }
         .sheet(isPresented: $showOCR) { OCRTextView(document: document) }
+        .sheet(isPresented: $showCrop) { if let p = currentPage { CropEditorView(page: p) } }
+        .sheet(isPresented: $showSignature) { if let p = currentPage { SignatureView(page: p) } }
+        .sheet(isPresented: $showReorder) { ReorderPagesView(document: document) }
         .sheet(isPresented: Binding(get: { shareItems != nil }, set: { if !$0 { shareItems = nil } })) {
             if let shareItems { ShareSheet(items: shareItems) }
         }

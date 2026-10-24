@@ -7,6 +7,7 @@ struct LibraryView: View {
 
     @State private var search = ""
     @State private var showScanner = false
+    @State private var showIDScanner = false
     @State private var newDocument: ScannedDocument?
     @State private var renaming: ScannedDocument?
     @State private var renameText = ""
@@ -51,12 +52,19 @@ struct LibraryView: View {
                     Button { showSettings = true } label: { Image(systemName: "gearshape") }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showScanner = true } label: {
+                    Menu {
+                        Button { showScanner = true } label: { Label("Scan document", systemImage: "doc.viewfinder") }
+                        Button { showIDScanner = true } label: { Label("Scan ID card", systemImage: "person.text.rectangle") }
+                    } label: {
                         Image(systemName: "doc.viewfinder").font(.title3)
                     }
                 }
             }
             .sheet(isPresented: $showSettings) { SettingsView() }
+            .fullScreenCover(isPresented: $showIDScanner) {
+                DocumentScannerView(onFinish: handleIDScan, onCancel: { showIDScanner = false })
+                    .ignoresSafeArea()
+            }
             .safeAreaInset(edge: .bottom) { scanButton }
             .fullScreenCover(isPresented: $showScanner) {
                 DocumentScannerView(onFinish: handleScan, onCancel: { showScanner = false })
@@ -120,6 +128,18 @@ struct LibraryView: View {
             doc.ocrText = text
             try? context.save()
         }
+        newDocument = doc
+    }
+
+    private func handleIDScan(_ images: [UIImage]) {
+        showIDScanner = false
+        guard let front = images.first else { return }
+        let combined = ImageProcessing.idCardPage(front: front, back: images.count > 1 ? images[1] : nil)
+        let doc = ScannedDocument(title: "ID card \(DateFormatter.short.string(from: .now))")
+        let file = ImageStore.save(combined)
+        doc.pages.append(ScanPage(index: 0, originalFile: file, filter: .original))
+        context.insert(doc)
+        try? context.save()
         newDocument = doc
     }
 
