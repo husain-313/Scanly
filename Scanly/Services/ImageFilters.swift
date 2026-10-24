@@ -25,6 +25,19 @@ final class ImageFilters {
         switch filter {
         case .original:
             out = ci
+        case .magic:
+            // The "clear scan" pipeline: even out the lighting, then lift
+            // contrast and sharpen the text edges.
+            let flat = flattenIllumination(ci)
+            let cc = CIFilter.colorControls()
+            cc.inputImage = flat
+            cc.contrast = 1.12
+            cc.brightness = 0.02
+            cc.saturation = 1.08
+            let sharp = CIFilter.sharpenLuminance()
+            sharp.inputImage = cc.outputImage ?? flat
+            sharp.sharpness = 0.7
+            out = sharp.outputImage ?? flat
         case .enhance:
             // Boost contrast and brightness for a clean "document" look.
             let f = CIFilter.colorControls()
@@ -35,20 +48,38 @@ final class ImageFilters {
             out = f.outputImage ?? ci
         case .grayscale:
             let f = CIFilter.photoEffectMono()
-            f.inputImage = ci
+            f.inputImage = flattenIllumination(ci)
             out = f.outputImage ?? ci
         case .blackWhite:
-            // High-contrast scan: desaturate then push to near black/white.
+            // Flatten lighting first so thresholding gives crisp black text on
+            // clean white, without shadow blotches.
+            let flat = flattenIllumination(ci)
             let mono = CIFilter.photoEffectNoir()
-            mono.inputImage = ci
+            mono.inputImage = flat
             let c = CIFilter.colorControls()
-            c.inputImage = mono.outputImage
-            c.contrast = 2.2
-            c.brightness = 0.1
-            out = c.outputImage ?? ci
+            c.inputImage = mono.outputImage ?? flat
+            c.contrast = 2.6
+            c.brightness = 0.15
+            out = c.outputImage ?? flat
         }
-        guard let cg = context.createCGImage(out, from: out.extent) else { return image }
+        let rect = ci.extent
+        guard let cg = context.createCGImage(out, from: rect.isInfinite ? out.extent : rect) else { return image }
         return UIImage(cgImage: cg, scale: image.scale, orientation: .up)
+    }
+
+    /// Divides the image by a blurred copy of itself to cancel uneven lighting
+    /// and shadows — the key step behind a clean, bright document scan.
+    private func flattenIllumination(_ ci: CIImage) -> CIImage {
+        let extent = ci.extent
+        let blur = CIFilter.gaussianBlur()
+        blur.inputImage = ci.clampedToExtent()
+        blur.radius = Float(max(extent.width, extent.height) / 25)
+        guard let background = blur.outputImage?.cropped(to: extent) else { return ci }
+        // Divide blend = background(base) / foreground(blend) → original / blurred.
+        let divide = CIFilter.divideBlendMode()
+        divide.inputImage = background      // blend (denominator)
+        divide.backgroundImage = ci         // base (numerator)
+        return divide.outputImage?.cropped(to: extent) ?? ci
     }
 
     func rotate(_ image: UIImage, degrees: Int) -> UIImage {

@@ -66,7 +66,7 @@ final class ScanPage {
         id: UUID = UUID(),
         index: Int,
         originalFile: String,
-        filter: PageFilter = .enhance,
+        filter: PageFilter = .magic,
         rotation: Int = 0,
         createdAt: Date = .now
     ) {
@@ -80,11 +80,12 @@ final class ScanPage {
 }
 
 enum PageFilter: String, CaseIterable, Identifiable {
-    case original, enhance, grayscale, blackWhite
+    case original, magic, enhance, grayscale, blackWhite
     var id: String { rawValue }
     var title: String {
         switch self {
         case .original: return "Original"
+        case .magic: return "Magic"
         case .enhance: return "Enhance"
         case .grayscale: return "Grayscale"
         case .blackWhite: return "B&W"
@@ -93,6 +94,7 @@ enum PageFilter: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .original: return "photo"
+        case .magic: return "wand.and.rays"
         case .enhance: return "wand.and.stars"
         case .grayscale: return "circle.lefthalf.filled"
         case .blackWhite: return "doc.text"
